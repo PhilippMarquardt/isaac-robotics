@@ -1,0 +1,184 @@
+{
+  "_object_kind": "vintage hand-crank cash register",
+  "_generated_from": "cashreg_llm_plan.json",
+  "asset": "../assets/source/cash_register/CashRegister_fully_split.usd",
+  "out": "../assets/usd/cash_register_v3.usd",
+  "interactives": [
+    {
+      "kind": "light",
+      "name": "front_keypad_and_keyfram",
+      "head_prim": "/CashRegister_01/part_0029",
+      "on_intensity": 1500.0,
+      "on_color": [
+        1.0,
+        0.55,
+        0.25
+      ]
+    },
+    {
+      "kind": "animated_part",
+      "name": "cash_drawer",
+      "prim": "/CashRegister_01/CashRegister_011_drawer",
+      "motion": "translate_y",
+      "amplitude": -180.0,
+      "prim_list": [
+        "/CashRegister_01/CashRegister_011_drawer",
+        "/CashRegister_01/part_0141",
+        "/CashRegister_01/part_0142",
+        "/CashRegister_01/part_0165",
+        "/CashRegister_01/part_0166"
+      ],
+      "world_center": [
+        0.01917,
+        -0.28707,
+        0.06543
+      ]
+    },
+    {
+      "kind": "animated_part",
+      "name": "side_hand_crank_housing_",
+      "prim": "/CashRegister_01/part_0108",
+      "motion": "rotate_z",
+      "amplitude": 180.0,
+      "prim_list": [
+        "/CashRegister_01/part_0108",
+        "/CashRegister_01/part_0109",
+        "/CashRegister_01/part_0167",
+        "/CashRegister_01/part_0168"
+      ],
+      "world_center": [
+        -0.11199,
+        -0.0918,
+        0.44693
+      ]
+    },
+    {
+      "kind": "light",
+      "name": "top_amount_display_hood",
+      "head_prim": "/CashRegister_01/part_0004",
+      "on_intensity": 1500.0,
+      "on_color": [
+        1.0,
+        0.55,
+        0.25
+      ]
+    },
+    {
+      "kind": "animated_part",
+      "name": "front_action_button",
+      "prim": "/CashRegister_01/part_0065",
+      "motion": "translate_y",
+      "amplitude": 5.0,
+      "prim_list": [
+        "/CashRegister_01/part_0065",
+        "/CashRegister_01/part_0133",
+        "/CashRegister_01/part_0135"
+      ],
+      "world_center": [
+        0.13264,
+        -0.17042,
+        0.29549
+      ]
+    },
+    {
+      "kind": "animated_part",
+      "name": "front_switch_lever",
+      "prim": "/CashRegister_01/part_0150",
+      "motion": "rotate_x",
+      "amplitude": 20.0,
+      "prim_list": [
+        "/CashRegister_01/part_0150",
+        "/CashRegister_01/part_0151"
+      ],
+      "world_center": [
+        0.14587,
+        -0.11477,
+        0.39368
+      ]
+    },
+    {
+      "kind": "animated_part",
+      "name": "keypad_key",
+      "prim": "/CashRegister_01/part_0129",
+      "motion": "translate_y",
+      "amplitude": 5.0,
+      "world_center": [
+        0.11794,
+        -0.12424,
+        0.36631
+      ]
+    },
+    {
+      "kind": "animated_part",
+      "name": "keypad_key_02",
+      "prim": "/CashRegister_01/part_0131",
+      "motion": "translate_y",
+      "amplitude": 5.0,
+      "world_center": [
+        0.11794,
+        -0.14862,
+        0.32408
+      ]
+    },
+    {
+      "kind": "animated_part",
+      "name": "keypad_key_03",
+      "prim": "/CashRegister_01/part_0132",
+      "motion": "translate_y",
+      "amplitude": 5.0,
+      "world_center": [
+        0.11794,
+        -0.16081,
+        0.30297
+      ]
+    },
+    {
+      "kind": "animated_part",
+      "name": "right_side_knob",
+      "prim": "/CashRegister_01/part_0143",
+      "motion": "rotate_x",
+      "amplitude": 180.0,
+      "world_center": [
+        0.3726,
+        -0.02695,
+        0.21745
+      ]
+    },
+    {
+      "kind": "animated_part",
+      "name": "top_key_button",
+      "prim": "/CashRegister_01/part_0147",
+      "motion": "translate_z",
+      "amplitude": -5.0,
+      "world_center": [
+        -0.10002,
+        -0.01015,
+        0.53609
+      ]
+    },
+    {
+      "kind": "animated_part",
+      "name": "top_key_button_02",
+      "prim": "/CashRegister_01/part_0148",
+      "motion": "translate_z",
+      "amplitude": -5.0,
+      "world_center": [
+        0.01806,
+        -0.01015,
+        0.53609
+      ]
+    },
+    {
+      "kind": "animated_part",
+      "name": "front_selector_lever",
+      "prim": "/CashRegister_01/part_0149",
+      "motion": "rotate_x",
+      "amplitude": 25.0,
+      "world_center": [
+        0.1025,
+        -0.10856,
+        0.41799
+      ]
+    }
+  ]
+}

@@ -1,0 +1,315 @@
+"""V26 MegaLoco: upgraded V22 transformer for the long single-GPU run.
+
+Design fixes vs the failed V25 (dead policy, NaN critic):
+  * log_std_init=-1.0  -> std=0.37 at init  (V25 used 1.0 -> motor-noise catastrophe)
+  * out_proj_gain=0.3  -> tiny initial action mean (V22 used 0.5)
+  * d_model=128        -> bigger width (V22 used 96)
+  * 1 vision + 2 loco + 1 cross-attn layers, 2 heads (shrunk for speed after MLP bench)
+  * ffn_mult=4         -> richer per-block compute
+  * Reuses V22's obs cfg so we can compare head-to-head.
+  * Aggressive NaN/inf guards on forward pass.
+
+Obs layout (matches G1V22ObsCfg):
+  actor   = proprio_flat (5 x 117) + cmd (4) + base_lin_vel (3) + height(11x17=187) = 779
+  critic  = same + priv(15) = 794
+"""
+from __future__ import annotations
+
+import torch
+import torch.nn as nn
+from tensordict import TensorDict
+
+from rsl_rl.modules import EmpiricalNormalization, HiddenState
+from rsl_rl.modules.distribution import Distribution
+from rsl_rl.utils import resolve_callable, unpad_trajectories
+
+from diff_loco.v16_flow import (
+    ANG_DIM, CMD_DIM, GRAV_DIM, JPOS_DIM, JVEL_DIM, LAST_ACT_DIM, LIN_VEL_DIM,
+    PROPRIO_FLAT, PROPRIO_HIST,
+)
+from diff_loco.v19_vit import _StateEncV19, _TinyBlock
+from diff_loco.v20_vit import _CrossAttnBlock, _HeightEncV20, _PrivEncV20, _ProprioPerStepEnc
+
+
+HEIGHT_H_V26 = 11
+HEIGHT_W_V26 = 17
+HEIGHT_DIM_V26 = HEIGHT_H_V26 * HEIGHT_W_V26  # 187
+N_HEIGHT_TOKENS = 25
+
+PRIV_DIM = 15
+N_LOCO_TOKENS_ACTOR = PROPRIO_HIST + 1       # 5 proprio + 1 state
+N_LOCO_TOKENS_CRITIC = PROPRIO_HIST + 2      # + priv
+
+NON_VIS_DIM = PROPRIO_FLAT + CMD_DIM + LIN_VEL_DIM
+EXPECTED_OBS_DIM_ACTOR = NON_VIS_DIM + HEIGHT_DIM_V26
+EXPECTED_OBS_DIM_CRITIC = EXPECTED_OBS_DIM_ACTOR + PRIV_DIM
+
+
+# Module-level registry: actor builds the vision encoder and puts it here;
+# critic looks it up and reuses (weight + compute sharing).
+# Key = (d_model, n_vision_layers, n_heads, ffn_mult).
+_VISION_REGISTRY: dict[tuple, "_VisionEncoderV26"] = {}
+# Compute cache: keyed by (data_ptr, numel) of the height tensor. Hit only if
+# identical tensor object — safe against in-place mutation via `is` check below.
+_VISION_CACHE: dict = {}
+
+
+class _VisionEncoderV26(nn.Module):
+    def __init__(self, d_model: int, n_layers: int, n_heads: int, ffn_mult: int):
+        super().__init__()
+        self.height_enc = _HeightEncV20(d_model)
+        self.type_embed = nn.Parameter(torch.randn(1, N_HEIGHT_TOKENS, d_model) * 0.02)
+        self.blocks = nn.ModuleList([_TinyBlock(d_model, n_heads, ffn_mult=ffn_mult) for _ in range(n_layers)])
+        self.final_norm = nn.LayerNorm(d_model)
+
+    def forward(self, height: torch.Tensor) -> torch.Tensor:
+        x = self.height_enc(height) + self.type_embed
+        for blk in self.blocks:
+            x = blk(x)
+        return self.final_norm(x)
+
+
+class _LocoTransformerV26(nn.Module):
+    def __init__(
+        self, d_model: int, n_self_layers: int, n_cross_layers: int,
+        n_heads: int, with_priv: bool, ffn_mult: int,
+    ):
+        super().__init__()
+        self.with_priv = with_priv
+        self.proprio_enc = _ProprioPerStepEnc(d_model)
+        self.state_enc = _StateEncV19(d_model)
+        self.priv_enc = _PrivEncV20(d_model) if with_priv else None
+        n_tokens = N_LOCO_TOKENS_CRITIC if with_priv else N_LOCO_TOKENS_ACTOR
+        self.type_embed = nn.Parameter(torch.randn(1, n_tokens, d_model) * 0.02)
+        self.self_blocks = nn.ModuleList(
+            [_TinyBlock(d_model, n_heads, ffn_mult=ffn_mult) for _ in range(n_self_layers)]
+        )
+        self.cross_blocks = nn.ModuleList(
+            [_CrossAttnBlock(d_model, n_heads, ffn_mult=ffn_mult) for _ in range(n_cross_layers)]
+        )
+        self.final_norm = nn.LayerNorm(d_model)
+
+    def forward(self, proprio_hist, cmd, lin_vel, visual_mem, priv=None) -> torch.Tensor:
+        p = self.proprio_enc(proprio_hist)
+        s = self.state_enc(cmd, lin_vel)
+        toks = [p, s]
+        if self.with_priv:
+            toks.append(self.priv_enc(priv))
+        x = torch.cat(toks, dim=1) + self.type_embed
+        for blk in self.self_blocks:
+            x = blk(x)
+        for blk in self.cross_blocks:
+            x = blk(x, visual_mem)
+        x = self.final_norm(x)
+        return x.mean(dim=1)
+
+
+class V26MegaLocoModel(nn.Module):
+    is_recurrent: bool = False
+
+    def __init__(
+        self,
+        obs: TensorDict,
+        obs_groups: dict[str, list[str]],
+        obs_set: str,
+        output_dim: int,
+        hidden_dims: tuple[int, ...] | list[int] = (256, 128),
+        activation: str = "elu",
+        obs_normalization: bool = True,
+        distribution_cfg: dict | None = None,
+        d_model: int = 128,
+        n_heads: int = 2,
+        n_vision_layers: int = 1,
+        n_loco_layers: int = 2,
+        n_cross_layers: int = 1,
+        ffn_mult: int = 4,
+        out_proj_gain: float = 0.3,
+    ) -> None:
+        super().__init__()
+        del activation
+
+        self.obs_groups = list(obs_groups[obs_set])
+        if len(self.obs_groups) != 1:
+            raise ValueError(f"V26 expects one obs group, got {self.obs_groups}")
+        self.obs_group = self.obs_groups[0]
+
+        self.is_actor = distribution_cfg is not None
+        expected = EXPECTED_OBS_DIM_ACTOR if self.is_actor else EXPECTED_OBS_DIM_CRITIC
+        flat_dim = int(obs[self.obs_group].shape[-1])
+        if flat_dim != expected:
+            raise ValueError(
+                f"V26 expects obs['{self.obs_group}'] dim {expected} "
+                f"(actor={self.is_actor}), got {flat_dim}"
+            )
+
+        self.obs_normalization = obs_normalization
+        self.non_vis_dim = NON_VIS_DIM
+        if obs_normalization:
+            self.obs_normalizer = EmpiricalNormalization(self.non_vis_dim)
+            self.priv_normalizer = EmpiricalNormalization(PRIV_DIM) if not self.is_actor else nn.Identity()
+        else:
+            self.obs_normalizer = nn.Identity()
+            self.priv_normalizer = nn.Identity()
+
+        self._vision_key = (d_model, n_vision_layers, n_heads, ffn_mult)
+        if self.is_actor or self._vision_key not in _VISION_REGISTRY:
+            # Actor (created first by rsl-rl) owns the vision encoder.
+            self.vision = _VisionEncoderV26(d_model, n_vision_layers, n_heads, ffn_mult=ffn_mult)
+        else:
+            # Critic references actor's vision encoder without registering it as
+            # a child module — avoids parameter duplication in the optimizer.
+            # Gradients still flow through autograd to actor's vision params.
+            object.__setattr__(self, "_vision_shared", _VISION_REGISTRY[self._vision_key])
+        self.loco = _LocoTransformerV26(
+            d_model, n_loco_layers, n_cross_layers, n_heads,
+            with_priv=not self.is_actor, ffn_mult=ffn_mult,
+        )
+        self.output_dim = int(output_dim)
+
+        if self.is_actor:
+            self.out_proj = nn.Linear(d_model, output_dim)
+            nn.init.orthogonal_(self.out_proj.weight, gain=out_proj_gain)
+            nn.init.zeros_(self.out_proj.bias)
+            dist_class: type[Distribution] = resolve_callable(distribution_cfg.pop("class_name"))
+            self.distribution: Distribution = dist_class(output_dim, **distribution_cfg)
+            if self.distribution.input_dim != output_dim:
+                raise ValueError("V26 distribution input_dim must equal output_dim.")
+            # Tame initial noise: -1.0 -> std=0.37, vs V25's 1.0, which failed.
+            if hasattr(self.distribution, "log_std_param"):
+                with torch.no_grad():
+                    self.distribution.log_std_param.data.fill_(-1.0)
+            self.mlp = nn.Sequential(nn.Linear(output_dim, output_dim))
+            self.distribution.init_mlp_weights(self.mlp)
+        else:
+            self.distribution = None  # type: ignore[assignment]
+            head_dims = [d_model] + list(hidden_dims) + [output_dim]
+            layers: list[nn.Module] = []
+            for i in range(len(head_dims) - 1):
+                layers.append(nn.Linear(head_dims[i], head_dims[i + 1]))
+                if i < len(head_dims) - 2:
+                    layers.append(nn.ELU())
+            self.critic_head = nn.Sequential(*layers)
+
+        # torch.compile the hot transformer paths. Default mode (no cudagraphs)
+        # because the shared vision cache between actor/critic breaks cudagraph
+        # tensor lifetimes. Default still fuses kernels via Inductor.
+        try:
+            if self.is_actor:
+                self.vision = torch.compile(self.vision, dynamic=False)
+                _VISION_REGISTRY[self._vision_key] = self.vision
+            self.loco = torch.compile(self.loco, dynamic=False)
+        except Exception:
+            if self.is_actor:
+                _VISION_REGISTRY[self._vision_key] = self.vision
+
+    def _split_obs(self, flat: torch.Tensor):
+        B = flat.shape[0]
+        off = 0
+        proprio_flat = flat[:, off:off + PROPRIO_FLAT]; off += PROPRIO_FLAT
+        cmd = flat[:, off:off + CMD_DIM]; off += CMD_DIM
+        lin_vel = flat[:, off:off + LIN_VEL_DIM]; off += LIN_VEL_DIM
+        height_flat = flat[:, off:off + HEIGHT_DIM_V26]; off += HEIGHT_DIM_V26
+        priv = flat[:, off:off + PRIV_DIM] if (not self.is_actor) else None
+
+        po = 0
+        ang = proprio_flat[:, po:po + PROPRIO_HIST * ANG_DIM].view(B, PROPRIO_HIST, ANG_DIM); po += PROPRIO_HIST * ANG_DIM
+        grv = proprio_flat[:, po:po + PROPRIO_HIST * GRAV_DIM].view(B, PROPRIO_HIST, GRAV_DIM); po += PROPRIO_HIST * GRAV_DIM
+        jp = proprio_flat[:, po:po + PROPRIO_HIST * JPOS_DIM].view(B, PROPRIO_HIST, JPOS_DIM); po += PROPRIO_HIST * JPOS_DIM
+        jv = proprio_flat[:, po:po + PROPRIO_HIST * JVEL_DIM].view(B, PROPRIO_HIST, JVEL_DIM); po += PROPRIO_HIST * JVEL_DIM
+        la = proprio_flat[:, po:po + PROPRIO_HIST * LAST_ACT_DIM].view(B, PROPRIO_HIST, LAST_ACT_DIM)
+        proprio_hist = torch.cat([ang, grv, jp, jv, la], dim=-1)
+
+        height = height_flat.view(B, HEIGHT_H_V26, HEIGHT_W_V26)
+        return proprio_hist, cmd, lin_vel, height, priv
+
+    def _vision_module(self) -> "_VisionEncoderV26":
+        return self.vision if self.is_actor else self._vision_shared
+
+    def _vision_forward(self, height: torch.Tensor) -> torch.Tensor:
+        # Compute cache: actor + critic receive the same obs tensor within one
+        # PPO minibatch forward pair. Cache key = id of height tensor.
+        cache_key = (id(height), height.shape[0])
+        cached = _VISION_CACHE.get(cache_key)
+        if cached is not None and cached[0] is height:
+            return cached[1]
+        out = self._vision_module()(height)
+        _VISION_CACHE[cache_key] = (height, out)
+        if len(_VISION_CACHE) > 8:
+            _VISION_CACHE.clear()
+        return out
+
+    def _encode(self, obs: TensorDict) -> torch.Tensor:
+        flat = obs[self.obs_group]
+        if self.obs_normalization:
+            non_vis = flat[:, :self.non_vis_dim]
+            vis_end = self.non_vis_dim + HEIGHT_DIM_V26
+            vis = flat[:, self.non_vis_dim:vis_end]
+            tail = flat[:, vis_end:]
+            non_vis = self.obs_normalizer(non_vis)
+            if (not self.is_actor) and tail.shape[-1] == PRIV_DIM:
+                tail = self.priv_normalizer(tail)
+            flat = torch.cat([non_vis, vis, tail], dim=-1)
+        proprio_hist, cmd, lin_vel, height, priv = self._split_obs(flat)
+        visual_mem = self._vision_forward(height)
+        return self.loco(proprio_hist, cmd, lin_vel, visual_mem, priv=priv)
+
+    def get_latent(self, obs, masks=None, hidden_state=None):
+        return self._encode(obs)
+
+    def update_normalization(self, obs: TensorDict) -> None:
+        if self.obs_normalization:
+            flat = obs[self.obs_group]
+            self.obs_normalizer.update(flat[:, :self.non_vis_dim])  # type: ignore
+            if not self.is_actor:
+                vis_end = self.non_vis_dim + HEIGHT_DIM_V26
+                self.priv_normalizer.update(flat[:, vis_end:vis_end + PRIV_DIM])  # type: ignore
+
+    def forward(self, obs, masks=None, hidden_state=None, stochastic_output=False):
+        obs = unpad_trajectories(obs, masks) if masks is not None and not self.is_recurrent else obs
+        latent = self._encode(obs)
+        latent = torch.nan_to_num(latent, nan=0.0, posinf=5.0, neginf=-5.0)
+        if self.is_actor:
+            mean = self.out_proj(latent)
+            mean = torch.nan_to_num(mean, nan=0.0, posinf=3.0, neginf=-3.0)
+            if hasattr(self.distribution, "log_std_param"):
+                with torch.no_grad():
+                    p = self.distribution.log_std_param
+                    bad = torch.isnan(p.data) | torch.isinf(p.data)
+                    if bad.any():
+                        p.data[bad] = -1.0
+                    p.data.clamp_(min=-5.0, max=1.0)
+            if stochastic_output:
+                self.distribution.update(mean)
+                return self.distribution.sample()
+            return self.distribution.deterministic_output(mean)
+        val = self.critic_head(latent)
+        return torch.nan_to_num(val, nan=0.0, posinf=50.0, neginf=-50.0)
+
+    def reset(self, dones=None, hidden_state=None) -> None: pass
+    def get_hidden_state(self) -> HiddenState: return None
+    def detach_hidden_state(self, dones=None) -> None: pass
+
+    @property
+    def output_mean(self) -> torch.Tensor:
+        return self.distribution.mean if self.is_actor else torch.zeros(1)
+
+    @property
+    def output_std(self) -> torch.Tensor:
+        return self.distribution.std if self.is_actor else torch.zeros(1)
+
+    @property
+    def output_entropy(self) -> torch.Tensor:
+        return self.distribution.entropy if self.is_actor else torch.zeros(1)
+
+    @property
+    def output_distribution_params(self):
+        return self.distribution.params if self.is_actor else ()
+
+    def get_output_log_prob(self, outputs: torch.Tensor) -> torch.Tensor:
+        return self.distribution.log_prob(outputs)
+
+    def get_kl_divergence(self, old_params, new_params) -> torch.Tensor:
+        return self.distribution.kl_divergence(old_params, new_params)
+
+    def as_jit(self): raise NotImplementedError
+    def as_onnx(self, verbose: bool): raise NotImplementedError

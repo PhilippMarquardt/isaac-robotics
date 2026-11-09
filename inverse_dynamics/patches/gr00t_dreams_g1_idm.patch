@@ -1,0 +1,216 @@
+diff --git a/IDM_dump/base.yaml b/IDM_dump/base.yaml
+index 37898b5..c0a944c 100644
+--- a/IDM_dump/base.yaml
++++ b/IDM_dump/base.yaml
+@@ -8,7 +8,7 @@ config:
+   model_dtype: float32
+   hidden_size: 0
+   action_horizon: 16
+-  action_dim: 32
++  action_dim: 64
+   backbone_cfg:
+     _target_: gr00t.model.backbone.IdentityBackbone
+   action_head_cfg:
+@@ -22,7 +22,7 @@ config:
+       model_dtype: float32
+       mm_vision_select_layer: -2
+       max_state_dim: 64
+-      max_action_dim: 32
++      max_action_dim: 64
+       hidden_size: 1024
+       tune_vision_tower: true
+       add_view_embed: true
+@@ -59,7 +59,7 @@ config:
+           hidden_size: 1024
+           mm_hidden_size: 1024
+           mm_projector_type: mlp_doubledownsample
+-      action_dim: 32
++      action_dim: 64
+       action_horizon: 16
+       num_inference_timesteps: 16
+       noise_beta_alpha: 1.5
+diff --git a/gr00t/data/dataset.py b/gr00t/data/dataset.py
+index 49c4f06..13b8253 100644
+--- a/gr00t/data/dataset.py
++++ b/gr00t/data/dataset.py
+@@ -296,10 +296,10 @@ class LeRobotSingleDataset(Dataset):
+             # NOTE(FH): different lerobot dataset versions have different keys for the number of channels and fps
+             try:
+                 channels = le_video_meta["shape"][le_video_meta["names"].index("channel")]
+-                fps = le_video_meta["video_info"]["video.fps"]
+             except ValueError:
+                 channels = le_video_meta["shape"][le_video_meta["names"].index("channels")]
+-                fps = le_video_meta["info"]["video.fps"]
++            fps_meta = le_video_meta.get("video_info") or le_video_meta.get("info", {})
++            fps = fps_meta["video.fps"]
+             simplified_modality_meta["video"][new_key] = {
+                 "resolution": [width, height],
+                 "channels": channels,
+@@ -335,7 +335,10 @@ class LeRobotSingleDataset(Dataset):
+                         state_action_meta.end,
+                     )
+                     stat = np.array(le_statistics[le_modality][stat_name])
+-                    dataset_statistics[our_modality][subkey][stat_name] = stat[indices].tolist()
++                    if stat.ndim == 0 or (stat.ndim == 1 and stat.shape[0] < state_action_meta.end):
++                        dataset_statistics[our_modality][subkey][stat_name] = stat.tolist()
++                    else:
++                        dataset_statistics[our_modality][subkey][stat_name] = stat[indices].tolist()
+ 
+         # 3. Full dataset metadata
+         metadata = DatasetMetadata(
+diff --git a/gr00t/data/embodiment_tags.py b/gr00t/data/embodiment_tags.py
+index 1056c91..6b6bae3 100644
+--- a/gr00t/data/embodiment_tags.py
++++ b/gr00t/data/embodiment_tags.py
+@@ -38,6 +38,11 @@ class EmbodimentTag(Enum):
+     """
+ 
+     ROBOCASA = "robocasa_panda_omron"
++    G1_DEX5 = "g1_dex5"
++    """
++    The Unitree G1 humanoid with Dex5 hands.
++    """
++
+     """
+     The ROBOCASA dataset.
+     """
+diff --git a/gr00t/experiment/data_config_idm.py b/gr00t/experiment/data_config_idm.py
+index 77bf8c5..6d45a5b 100644
+--- a/gr00t/experiment/data_config_idm.py
++++ b/gr00t/experiment/data_config_idm.py
+@@ -776,10 +776,66 @@ class FrankaDataConfig(BaseDataConfig):
+         return ComposedModalityTransform(transforms=transforms)
+ 
+ 
++
++
++class G1FullBodyDataConfig(BaseDataConfig):
++    video_keys = ["video.ego_view"]
++    state_keys = [
++        "state.left_leg",
++        "state.right_leg",
++        "state.waist",
++        "state.left_arm",
++        "state.right_arm",
++        "state.left_hand",
++        "state.right_hand",
++    ]
++    action_keys = [
++        "action.left_leg",
++        "action.right_leg",
++        "action.waist",
++        "action.left_arm",
++        "action.right_arm",
++        "action.left_hand",
++        "action.right_hand",
++    ]
++    language_keys = ["annotation.human.task_description"]
++    observation_indices = [0, 16]
++    action_indices = list(range(16))
++
++    def modality_config(self):
++        video_modality = ModalityConfig(delta_indices=self.observation_indices, modality_keys=self.video_keys)
++        state_modality = ModalityConfig(delta_indices=self.observation_indices, modality_keys=self.state_keys)
++        action_modality = ModalityConfig(delta_indices=self.action_indices, modality_keys=self.action_keys)
++        language_modality = ModalityConfig(delta_indices=self.observation_indices, modality_keys=self.language_keys)
++        return {"video": video_modality, "state": state_modality, "action": action_modality, "language": language_modality}
++
++    def transform(self):
++        transforms = [
++            VideoToTensor(apply_to=self.video_keys),
++            VideoCrop(apply_to=self.video_keys, scale=0.95),
++            VideoResize(apply_to=self.video_keys, height=224, width=224, interpolation="linear"),
++            VideoColorJitter(apply_to=self.video_keys, brightness=0.3, contrast=0.4, saturation=0.5, hue=0.08),
++            VideoToNumpy(apply_to=self.video_keys),
++            StateActionToTensor(apply_to=self.state_keys),
++            StateActionTransform(apply_to=self.state_keys, normalization_modes={k: "min_max" for k in self.state_keys}),
++            StateActionToTensor(apply_to=self.action_keys),
++            StateActionTransform(apply_to=self.action_keys, normalization_modes={k: "min_max" for k in self.action_keys}),
++            ConcatTransform(video_concat_order=self.video_keys, state_concat_order=self.state_keys, action_concat_order=self.action_keys),
++            GR00TIDMTransform(
++                state_horizon=len(self.observation_indices),
++                action_horizon=len(self.action_indices),
++                max_state_dim=64,
++                max_action_dim=64,
++            ),
++        ]
++        return ComposedModalityTransform(transforms=transforms)
++
++
+ DATA_CONFIG_MAP = {
+     "gr1_arms_waist": Gr1ArmsWaistDataConfig(),
+     "gr1_arms_only": Gr1ArmsOnlyDataConfig(),
+     "gr1_full_upper_body": Gr1FullUpperBodyDataConfig(),
++    "g1_full_body": G1FullBodyDataConfig(),
+     "bimanual_panda_gripper": BimanualPandaGripperDataConfig(),
+     "bimanual_panda_hand": BimanualPandaHandDataConfig(),
+     "single_panda_gripper": SinglePandaGripperDataConfig(),
+diff --git a/gr00t/experiment/trainer.py b/gr00t/experiment/trainer.py
+index 16a5822..d1f8f06 100755
+--- a/gr00t/experiment/trainer.py
++++ b/gr00t/experiment/trainer.py
+@@ -20,8 +20,8 @@ from typing import Optional
+ import torch
+ import transformers
+ from torch.utils.data import Dataset, Sampler
++from transformers.pytorch_utils import ALL_LAYERNORM_LAYERS
+ from transformers.trainer import (
+-    ALL_LAYERNORM_LAYERS,
+     TRAINER_STATE_NAME,
+     TrainerState,
+     get_last_checkpoint,
+@@ -65,8 +65,9 @@ class DualBrainTrainer(transformers.Trainer):
+         self.compute_dtype = kwargs.pop("compute_dtype")
+         super().__init__(**kwargs)
+ 
+-    def _get_train_sampler(self):
+-        return BaseSampler(self.train_dataset, shuffle=True, seed=self.args.seed)
++    def _get_train_sampler(self, train_dataset=None):
++        ds = train_dataset if train_dataset is not None else self.train_dataset
++        return BaseSampler(ds, shuffle=True, seed=self.args.seed)
+ 
+     def _get_eval_sampler(self, eval_dataset):
+         return BaseSampler(eval_dataset, shuffle=False)
+diff --git a/gr00t/model/idm.py b/gr00t/model/idm.py
+index 23d6e32..446bb5e 100644
+--- a/gr00t/model/idm.py
++++ b/gr00t/model/idm.py
+@@ -174,11 +174,11 @@ class IDM(PreTrainedModel):
+         action_inputs = self.action_head.prepare_input(inputs)
+ 
+         def to_device_with_maybe_dtype(x):
+-            # Only cast to self.compute_dtype if the tensor is floating
++            if not isinstance(x, torch.Tensor):
++                return x
+             if torch.is_floating_point(x):
+                 return x.to(self.device, dtype=self.action_head.dtype)
+             else:
+-                # Keep original dtype
+                 return x.to(self.device)
+ 
+         backbone_inputs = tree.map_structure(to_device_with_maybe_dtype, backbone_inputs)
+diff --git a/gr00t/model/transforms_idm.py b/gr00t/model/transforms_idm.py
+index 725ac6a..52ce4e6 100644
+--- a/gr00t/model/transforms_idm.py
++++ b/gr00t/model/transforms_idm.py
+@@ -60,6 +60,7 @@ class GR00TIDMTransform(InvertibleModalityTransform):
+         "franka": 17,
+         "so100": 26,
+         "robocasa_panda_omron": 13,
++        "g1_dex5": 30,
+         "new_embodiment": 31,  # use the last projector for new embodiment,
+     }
+ 
+diff --git a/scripts/idm_training.py b/scripts/idm_training.py
+index 5b22e36..a84247c 100644
+--- a/scripts/idm_training.py
++++ b/scripts/idm_training.py
+@@ -164,7 +164,7 @@ def main(config: Config):
+         max_steps=config.max_steps,
+         save_strategy="steps",
+         save_steps=config.save_steps,
+-        save_total_limit=8,
++        save_total_limit=1,
+         report_to=config.report_to,
+         seed=42,
+         do_eval=False,

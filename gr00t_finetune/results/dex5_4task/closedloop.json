@@ -1,0 +1,87 @@
+{
+  "pillow": [
+    {
+      "pred_vs_gt_action_mean": 0.23899054682553922,
+      "state_vs_gt_action_mean": 0.20543567068043517,
+      "n_infers": 66
+    },
+    {
+      "pred_vs_gt_action_mean": 0.2733911438736353,
+      "state_vs_gt_action_mean": 0.23733957337859835,
+      "n_infers": 61
+    },
+    {
+      "pred_vs_gt_action_mean": 0.29925770183560024,
+      "state_vs_gt_action_mean": 0.2616803452444537,
+      "n_infers": 62
+    }
+  ],
+  "clothes": [
+    {
+      "pred_vs_gt_action_mean": 0.4935459360663134,
+      "state_vs_gt_action_mean": 0.4689623338780186,
+      "n_infers": 92
+    },
+    {
+      "pred_vs_gt_action_mean": 0.41397576169101896,
+      "state_vs_gt_action_mean": 0.38401477944976453,
+      "n_infers": 67
+    },
+    {
+      "pred_vs_gt_action_mean": 0.39743147895129727,
+      "state_vs_gt_action_mean": 0.37058990752013804,
+      "n_infers": 67
+    }
+  ],
+  "washing": [
+    {
+      "pred_vs_gt_action_mean": 0.2708679411718561,
+      "state_vs_gt_action_mean": 0.24780887625941908,
+      "n_infers": 51
+    },
+    {
+      "pred_vs_gt_action_mean": 0.29852814615873585,
+      "state_vs_gt_action_mean": 0.2709939147014193,
+      "n_infers": 53
+    },
+    {
+      "pred_vs_gt_action_mean": 0.24056237355360746,
+      "state_vs_gt_action_mean": 0.2210107221209555,
+      "n_infers": 54
+    }
+  ],
+  "fridge": [
+    {
+      "pred_vs_gt_action_mean": 0.37064114690170336,
+      "state_vs_gt_action_mean": 0.34233469602641103,
+      "n_infers": 223
+    },
+    {
+      "pred_vs_gt_action_mean": 0.3443619136950994,
+      "state_vs_gt_action_mean": 0.3211004860744515,
+      "n_infers": 115
+    },
+    {
+      "pred_vs_gt_action_mean": 0.3194158382588099,
+      "state_vs_gt_action_mean": 0.2958743614459817,
+      "n_infers": 118
+    }
+  ],
+  "basket_OOD": [
+    {
+      "pred_vs_gt_action_mean": 0.4201935395274491,
+      "state_vs_gt_action_mean": 0.39114007412887875,
+      "n_infers": 199
+    },
+    {
+      "pred_vs_gt_action_mean": 0.4191036058268572,
+      "state_vs_gt_action_mean": 0.38861978939493086,
+      "n_infers": 198
+    },
+    {
+      "pred_vs_gt_action_mean": 0.45006200873731617,
+      "state_vs_gt_action_mean": 0.41979249406860764,
+      "n_infers": 207
+    }
+  ]
+}

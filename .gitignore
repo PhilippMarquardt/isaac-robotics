@@ -1,0 +1,62 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.ipynb_checkpoints/
+
+# Secrets
+.env
+*.token
+
+# Data and datasets
+/data/
+/datasets/
+*.parquet
+*.npz
+*.npy
+*.h5
+*.hdf5
+*.pkl
+*.ply
+*.rrd
+*.bag
+*.mcap
+
+# Checkpoints and exported models
+*.pt
+*.pth
+*.ckpt
+*.safetensors
+*.onnx
+*.onnx.data
+checkpoints/
+ckpts/
+
+# Logs and experiment tracking
+logs/
+outputs/
+runs/
+wandb/
+*.log
+events.out.tfevents.*
+
+# Videos (small curated clips in docs/media are kept)
+*.mp4
+*.avi
+*.mov
+*.webm
+!docs/media/*.mp4
+
+# Third-party assets fetched separately
+tools/scene_pipeline/assets/source/
+gr00t_finetune/sim_viz/assets/meshes/
+gr00t_finetune/sim_viz/assets/g1_29dof_inspire_DFQ.*
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp

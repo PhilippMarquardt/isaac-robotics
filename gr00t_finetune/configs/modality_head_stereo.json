@@ -1,0 +1,86 @@
+{
+    "state": {
+        "left_leg": {
+            "start": 7,
+            "end": 13,
+            "original_key": "observation.state.robot_q_current"
+        },
+        "right_leg": {
+            "start": 13,
+            "end": 19,
+            "original_key": "observation.state.robot_q_current"
+        },
+        "waist": {
+            "start": 19,
+            "end": 22,
+            "original_key": "observation.state.robot_q_current"
+        },
+        "left_arm": {
+            "start": 22,
+            "end": 29,
+            "original_key": "observation.state.robot_q_current"
+        },
+        "right_arm": {
+            "start": 29,
+            "end": 36,
+            "original_key": "observation.state.robot_q_current"
+        },
+        "left_hand": {
+            "start": 0,
+            "end": 6,
+            "original_key": "observation.state.hand_state"
+        },
+        "right_hand": {
+            "start": 6,
+            "end": 12,
+            "original_key": "observation.state.hand_state"
+        }
+    },
+    "action": {
+        "left_leg": {
+            "start": 7,
+            "end": 13,
+            "original_key": "action.robot_q_desired"
+        },
+        "right_leg": {
+            "start": 13,
+            "end": 19,
+            "original_key": "action.robot_q_desired"
+        },
+        "waist": {
+            "start": 19,
+            "end": 22,
+            "original_key": "action.robot_q_desired"
+        },
+        "left_arm": {
+            "start": 22,
+            "end": 29,
+            "original_key": "action.robot_q_desired"
+        },
+        "right_arm": {
+            "start": 29,
+            "end": 36,
+            "original_key": "action.robot_q_desired"
+        },
+        "left_hand": {
+            "start": 0,
+            "end": 6,
+            "original_key": "action.hand_cmd"
+        },
+        "right_hand": {
+            "start": 6,
+            "end": 12,
+            "original_key": "action.hand_cmd"
+        }
+    },
+    "video": {
+        "ego_view": {
+            "original_key": "observation.images.head_stereo_left"
+        }
+    },
+    "annotation": {
+        "human.task_description": {
+            "original_key": "task_index"
+        }
+    }
+}

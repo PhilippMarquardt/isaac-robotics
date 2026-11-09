@@ -1,0 +1,34 @@
+{
+  "_real_world_inventory": [
+    "cash drawer (slides forward)",
+    "key bank (presses down ~6 mm)",
+    "totalizer display (illuminates)"
+  ],
+  "asset": "../assets/source/cash_register/CashRegister_split2.usd",
+  "out":   "../assets/usd/cash_register_v2.usd",
+  "interactives": [
+    {
+      "kind": "animated_part",
+      "name": "cash_drawer",
+      "prim": "/CashRegister_01/CashRegister_011_drawer",
+      "motion": "translate_y",
+      "amplitude": -180.0
+    },
+    {
+      "kind": "animated_part",
+      "name": "key_bank",
+      "prim": "/CashRegister_01/key_bank",
+      "motion": "translate_z",
+      "amplitude": -8.0,
+      "linked_light": "display_glow",
+      "triggers": "cash_drawer"
+    },
+    {
+      "kind": "light",
+      "name": "display_glow",
+      "head_prim": "/CashRegister_01/display_glass",
+      "on_intensity": 1500,
+      "on_color": [1.0, 0.55, 0.25]
+    }
+  ]
+}

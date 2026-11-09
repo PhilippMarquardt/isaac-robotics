@@ -1,0 +1,35 @@
+seed: 42
+
+model:
+  encoder_name: "vit_small_patch16_224"
+  pretrained: true
+  state_tokens: 64
+  future_tokens: 16
+  state_dim: 384
+  action_tokens: 8
+  action_dim: 256
+  inverse_depth: 2
+  transition_depth: 2
+  flow_depth: 2
+  num_heads: 8
+  z_dropout: 0.1
+  z_noise_std: 0.0
+  pretrained_flag: true
+
+data:
+  image_size: 224
+  batch_size: 8
+
+ema:
+  momentum: 0.996
+
+optim:
+  lr: 3.0e-4
+  weight_decay: 0.05
+  grad_clip: 1.0
+
+loss:
+  lambda_transition: 1.0
+  lambda_flow: 0.5
+  lambda_z_l2: 0.001
+  lambda_z_var: 0.05

@@ -1,0 +1,14 @@
+LIGHT  front_keypad_and_keyfram          /CashRegister_01/part_0029  (display_panel)
+MOVE   cash_drawer                       /CashRegister_01/CashRegister_011_drawer (+4 more)  motion=translate_y  amp=-180.00  trig=[]
+MOVE   side_hand_crank_housing_          /CashRegister_01/part_0108 (+3 more)  motion=rotate_z  amp=180.00  trig=[]
+LIGHT  top_amount_display_hood           /CashRegister_01/part_0004  (display_panel)
+MOVE   front_action_button               /CashRegister_01/part_0065 (+2 more)  motion=translate_y  amp=5.00  trig=[]
+MOVE   front_switch_lever                /CashRegister_01/part_0150 (+1 more)  motion=rotate_x  amp=20.00  trig=[]
+SKIP   drawer_front_handle_bar           /CashRegister_01/part_0017  (no movable physics)
+MOVE   keypad_key                        /CashRegister_01/part_0129  motion=translate_y  amp=5.00  trig=[]
+MOVE   keypad_key_02                     /CashRegister_01/part_0131  motion=translate_y  amp=5.00  trig=[]
+MOVE   keypad_key_03                     /CashRegister_01/part_0132  motion=translate_y  amp=5.00  trig=[]
+MOVE   right_side_knob                   /CashRegister_01/part_0143  motion=rotate_x  amp=180.00  trig=[]
+MOVE   top_key_button                    /CashRegister_01/part_0147  motion=translate_z  amp=-5.00  trig=[]
+MOVE   top_key_button_02                 /CashRegister_01/part_0148  motion=translate_z  amp=-5.00  trig=[]
+MOVE   front_selector_lever              /CashRegister_01/part_0149  motion=rotate_x  amp=25.00  trig=[]

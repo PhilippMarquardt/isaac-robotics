@@ -1,0 +1,11 @@
+# Patch for cosmos-predict2.5 dataset_video.py
+# Fixes: ValueError: high <= 0 when clip length exactly equals num_frames
+# Path in the checkout: /root/cosmos-predict2.5/cosmos_predict2/_src/predict2/datasets/local_datasets/dataset_video.py
+# Approx line 101 of VideoDataset._load_video()
+
+--- dataset_video.py.orig
++++ dataset_video.py
+@@ -98,7 +98,7 @@
+         max_start_idx = total_frames - sequence_length
+-        start_frame = np.random.randint(0, max_start_idx)
++        start_frame = 0 if max_start_idx <= 0 else int(np.random.randint(0, max_start_idx))

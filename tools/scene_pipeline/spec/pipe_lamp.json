@@ -1,0 +1,22 @@
+{
+  "asset": "../assets/source/pipe_lamp/industrial_pipe_lamp_1k.usdc",
+  "out":   "../assets/usd/pipe_lamp_v2.usd",
+  "interactives": [
+    {
+      "kind": "light",
+      "name": "main_bulb",
+      "head_prim": "/industrial_pipe_lamp/industrial_pipe_lamp_bulb",
+      "emissive_material": "/industrial_pipe_lamp/_materials/industrial_pipe_lamp_glass",
+      "on_intensity": 5000,
+      "on_color": [1.0, 0.95, 0.85]
+    },
+    {
+      "kind": "animated_part",
+      "name": "power_switch",
+      "prim": "/industrial_pipe_lamp/industrial_pipe_lamp_switch",
+      "motion": "rotate_y",
+      "amplitude": 22.0,
+      "linked_light": "main_bulb"
+    }
+  ]
+}

@@ -1,0 +1,4 @@
+[
+  {"input_video": "/workspace/gen_out/heldout_seeds/pillow_under_table.png", "prompt": "Pick up the pillow.", "output_video": "/workspace/gen_out/under_table/p1_pickup_plain.mp4"},
+  {"input_video": "/workspace/gen_out/heldout_seeds/pillow_under_table.png", "prompt": "Pick up the pillow from under the table and place it on the table.", "output_video": "/workspace/gen_out/under_table/p3_pickup_from_under.mp4"}
+]

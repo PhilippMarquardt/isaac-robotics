@@ -1,0 +1,7 @@
+[
+  {"input_video": "/workspace/gen_out/heldout_seeds/G1_WB_Dex5_Pickup_Pillow_val0.png", "prompt": "Pick up the pillow and put it on the sofa.", "output_video": "/workspace/gen_out/baseline_held/pillow_val0_sofa.mp4"},
+  {"input_video": "/workspace/gen_out/heldout_seeds/G1_WB_Dex5_Pickup_Pillow_val1.png", "prompt": "Pick up the pillow.", "output_video": "/workspace/gen_out/baseline_held/pillow_val1_short.mp4"},
+  {"input_video": "/workspace/gen_out/heldout_seeds/G1_WB_Dex5_Collect_Clothes_val0.png", "prompt": "Collect the clothes on the floor.", "output_video": "/workspace/gen_out/baseline_held/clothes_val0_collect.mp4"},
+  {"input_video": "/workspace/gen_out/heldout_seeds/G1_WB_Dex5_Collect_Clothes_val1.png", "prompt": "Pick up the clothes and fold them.", "output_video": "/workspace/gen_out/baseline_held/clothes_val1_fold.mp4"},
+  {"input_video": "/workspace/gen_out/heldout_seeds/G1_WB_Dex5_Put_Clothes_into_Washing_Machine_val0.png", "prompt": "Put the clothes into the washing machine.", "output_video": "/workspace/gen_out/baseline_held/washer_val0_ood.mp4"}
+]

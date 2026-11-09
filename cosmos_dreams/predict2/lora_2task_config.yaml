@@ -1,0 +1,671 @@
+checkpoint:
+  broadcast_via_filesystem: 'False'
+  dcp_allow_mismatched_size: 'False'
+  dcp_async_mode_enabled: 'False'
+  jit:
+    device: cuda
+    dtype: bfloat16
+    enabled: 'False'
+    input_shape: null
+    strict: 'True'
+  keys_not_to_resume: []
+  load_ema_to_reg: 'False'
+  load_path: ''
+  load_training_state: 'False'
+  only_load_scheduler_state: 'False'
+  save_iter: '1000'
+  strict_resume: 'True'
+  type:
+    _target_: <class 'cosmos_predict2.checkpointer.Checkpointer'>
+    callbacks: null
+  verbose: 'True'
+dataloader_train:
+  _target_: <class 'torch.utils.data.dataloader.DataLoader'>
+  batch_sampler: null
+  batch_size: '1'
+  collate_fn: null
+  dataset:
+    _target_: <class 'cosmos_predict2.data.dataset_video.Dataset'>
+    dataset_dir: /workspace/data/cosmos_train/g1_wbt_2task
+    num_frames: '93'
+    video_size:
+    - '432'
+    - '768'
+  drop_last: 'True'
+  generator: null
+  in_order: 'True'
+  multiprocessing_context: null
+  num_workers: '4'
+  persistent_workers: 'False'
+  pin_memory: 'True'
+  pin_memory_device: ''
+  prefetch_factor: null
+  sampler:
+    _target_: <function get_sampler at 0x7cb2aef92320>
+    dataset:
+      _target_: <class 'cosmos_predict2.data.dataset_video.Dataset'>
+      dataset_dir: /workspace/data/cosmos_train/g1_wbt_2task
+      num_frames: '93'
+      video_size:
+      - '432'
+      - '768'
+  shuffle: null
+  timeout: '0'
+  worker_init_fn: null
+dataloader_val:
+  _target_: <class 'cosmos_predict2.datasets.joint_dataloader.IterativeJointDataLoader'>
+  dataloaders:
+    image_data:
+      dataloader:
+        _target_: <function get_cached_replay_dataloader at 0x7cb2afe6c940>
+        batch_size: '2'
+        cache_augment_fn: null
+        cache_replay_name: image_dataloader
+        cache_size: '32'
+        concat_size: '1'
+        dataset:
+          _target_: <function get_image_dataset at 0x7cb2afe6d5a0>
+          len_t5: '512'
+          resolution: '480'
+          t5_dim: '1024'
+        num_workers: '0'
+        pin_memory: 'True'
+        shuffle: 'False'
+        use_cache: 'False'
+        webdataset: 'False'
+      ratio: '1'
+    video_data:
+      dataloader:
+        _target_: <function get_cached_replay_dataloader at 0x7cb2afe6c940>
+        batch_size: '1'
+        cache_augment_fn: null
+        cache_replay_name: video_dataloader
+        cache_size: '32'
+        concat_size: '1'
+        dataset:
+          _target_: <function get_video_dataset at 0x7cb2afe6d750>
+          len_t5: '512'
+          num_video_frames: '93'
+          resolution: '480'
+          t5_dim: '1024'
+        num_workers: '0'
+        pin_memory: 'True'
+        shuffle: 'False'
+        use_cache: 'False'
+        webdataset: 'False'
+      ratio: '1'
+defaults:
+- _self_
+- dataloader_train: null
+- dataloader_val: null
+- optimizer: fusedadamw
+- scheduler: constant
+- model: predict2_multiview_fsdp_2b_720p_29frames_10fps
+- callbacks:
+  - basic
+- net: null
+- ema: null
+- checkpoint: null
+- ckpt_type: null
+- experiment: null
+job:
+  group: video2world_lora
+  name: 2b_g1_wbt_2task
+  project: posttraining
+model:
+  _recursive_: 'False'
+  _target_: <class 'cosmos_predict2.models.video2world_model.Predict2Video2WorldModel'>
+  config:
+    adjust_video_noise: true
+    debug_without_randomness: false
+    fsdp_shard_size: 1
+    high_sigma_ratio: 0.05
+    init_lora_weights: true
+    input_image_key: images
+    input_video_key: video
+    lora_alpha: 32
+    lora_rank: 32
+    lora_target_modules: q_proj,k_proj,v_proj,output_proj,mlp.layer1,mlp.layer2
+    loss_reduce: mean
+    loss_scale: 10.0
+    model_manager_config:
+      _target_: cosmos_predict2.models.video2world_model.Predict2ModelManagerConfig
+      dit_path: checkpoints/nvidia/Cosmos-Predict2-2B-Video2World/model-720p-16fps.pt
+      text_encoder_path: ''
+    pipe_config:
+      adjust_video_noise: true
+      conditioner:
+        _target_: <class 'cosmos_predict2.conditioner.VideoConditioner'>
+        fps:
+          _target_: <class 'cosmos_predict2.conditioner.ReMapkey'>
+          dropout_rate: '0.0'
+          dtype: null
+          input_key: fps
+          output_key: fps
+        padding_mask:
+          _target_: <class 'cosmos_predict2.conditioner.ReMapkey'>
+          dropout_rate: '0.0'
+          dtype: null
+          input_key: padding_mask
+          output_key: padding_mask
+        text:
+          _target_: <class 'cosmos_predict2.conditioner.TextAttr'>
+          dropout_rate: '0.2'
+          input_key:
+          - t5_text_embeddings
+        use_video_condition:
+          _target_: <class 'cosmos_predict2.conditioner.BooleanFlag'>
+          dropout_rate: '0.0'
+          input_key: fps
+          output_key: use_video_condition
+      conditioning_strategy: frame_replace
+      ema:
+        _target_: cosmos_predict2.configs.base.defaults.ema.EMAConfig
+        enabled: 'True'
+        iteration_shift: '0'
+        rate: '0.1'
+      guardrail_config:
+        checkpoint_dir: checkpoints
+        enabled: false
+        offload_model_to_cpu: true
+      input_image_key: images
+      input_video_key: video
+      max_num_conditional_frames: 2
+      min_num_conditional_frames: 1
+      net:
+        _target_: <class 'cosmos_predict2.models.video2world_dit.MinimalV1LVGDiT'>
+        adaln_lora_dim: '256'
+        atten_backend: minimal_a2a
+        concat_padding_mask: 'True'
+        extra_per_block_abs_pos_emb: 'False'
+        in_channels: '16'
+        max_frames: '128'
+        max_img_h: '240'
+        max_img_w: '240'
+        model_channels: '2048'
+        num_blocks: '28'
+        num_heads: '16'
+        out_channels: '16'
+        patch_spatial: '2'
+        patch_temporal: '1'
+        pos_emb_cls: rope3d
+        pos_emb_interpolation: crop
+        pos_emb_learnable: 'True'
+        rope_enable_fps_modulation: 'False'
+        rope_h_extrapolation_ratio: '3.0'
+        rope_t_extrapolation_ratio: '1.0'
+        rope_w_extrapolation_ratio: '3.0'
+        sac_config:
+          _target_: cosmos_predict2.models.text2image_dit.SACConfig
+          every_n_blocks: '1'
+          mode: predict2_2b_720
+        use_adaln_lora: 'True'
+      precision: bfloat16
+      prompt_refiner_config:
+        checkpoint_dir: checkpoints/nvidia/Cosmos-Reason1-7B
+        enabled: false
+        offload_model_to_cpu: true
+      rectified_flow_loss_weight_uniform: true
+      rectified_flow_t_scaling_factor: 1.0
+      resize_online: true
+      resolution: '720'
+      sigma_conditional: 0.0001
+      sigma_data: 1.0
+      state_ch: 16
+      state_t: 24
+      text_encoder:
+        cls: !!python/object/apply:imaginaire.constants.TextEncoderClass
+        - t5
+        cosmos_reason1:
+          ckpt_path: checkpoints/nvidia/Cosmos-Reason1-Private/reason1_internal_real.pt
+          compute_online: true
+          embed_dim: 100352
+          embedding_concat_strategy: full_concat
+          model_config:
+            _target_: <class 'imaginaire.models.vlm_qwen_omni.QwenVLBaseModel'>
+            model_config:
+              _target_: imaginaire.configs.reason1.model_config_qwen.QwenModelConfig
+              activation_checkpoint:
+                mode: selective
+                models: vlm
+                selective_ac_option: op
+              add_answer_tag: 'True'
+              add_cross_attention: 'False'
+              add_image_start_end_tag: 'False'
+              add_tile_tag: 'False'
+              architectures:
+              - Qwen2_5_VLForConditionalGeneration
+              attention_dropout: '0.0'
+              attn_implementation: flash_attention_2
+              attn_implementation_autoset: 'True'
+              aux_loss_coeff: '0.0'
+              bad_words_ids: null
+              begin_suppress_tokens: null
+              bos_token_id: '151643'
+              cache_dir: null
+              checkpoint:
+                async_mode: disabled
+                create_seed_checkpoint: false
+                enable_checkpoint: false
+                export_dtype: float32
+                folder: checkpoint
+                interval: 500
+                interval_type: steps
+                model_weights_only: false
+              chunk_size_feed_forward: '0'
+              ckpt_dir: null
+              ckpt_path: null
+              comm:
+                init_timeout_seconds: 300
+                trace_buf_size: 20000
+                train_timeout_seconds: 100
+              cp_size: null
+              cross_attention_hidden_size: null
+              decoder_start_token_id: null
+              deterministic: 'False'
+              diversity_penalty: '0.0'
+              do_sample: 'False'
+              early_stopping: 'False'
+              encoder_no_repeat_ngram_size: '0'
+              eos_token_id: '151645'
+              ep_size: null
+              experimental:
+                enable_async_tensor_parallel: false
+                enable_compiled_autograd: false
+                pipeline_parallel_degree: 1
+              exponential_decay_length_penalty: null
+              finetuning_task: null
+              float8:
+                enable_float8_linear: false
+              forced_bos_token_id: null
+              forced_eos_token_id: null
+              freeze_llm: 'False'
+              freeze_mm_projector: 'False'
+              freeze_vision_encoder: 'False'
+              fsdp_enabled: 'False'
+              hidden_act: silu
+              hidden_size: '3584'
+              id2label:
+                0: LABEL_0
+                1: LABEL_1
+              image_token_id: '151655'
+              initializer_range: '0.02'
+              intermediate_size: '18944'
+              is_decoder: 'False'
+              is_encoder_decoder: 'False'
+              label2id:
+                LABEL_0: '0'
+                LABEL_1: '1'
+              length_penalty: '1.0'
+              loss_per_token: 'True'
+              max_batch_size: '1'
+              max_length: '20'
+              max_position_embeddings: '128000'
+              max_seq_len: '128000'
+              max_window_layers: '28'
+              min_length: '0'
+              mm_projector: null
+              model_type: qwen2_5_vl
+              name_or_path: Qwen/Qwen2.5-VL-7B-Instruct
+              no_repeat_ngram_size: '0'
+              num_attention_heads: '28'
+              num_beam_groups: '1'
+              num_beams: '1'
+              num_hidden_layers: '28'
+              num_key_value_heads: '4'
+              num_return_sequences: '1'
+              num_tiles: '1'
+              optimizer:
+                early_step_in_backward: false
+                end_lr: 2.5e-05
+                fused: false
+                init_lr: 1.0e-05
+                lr: 0.0003
+                lr_multiplier_llm: 1.0
+                lr_multiplier_mm_projector: 1.0
+                lr_multiplier_vision_encoder: 0.1
+                name: AdamW
+              output_attentions: 'False'
+              output_hidden_states: 'True'
+              output_scores: 'False'
+              pad_token_id: null
+              precision: bfloat16
+              prefix: null
+              prepend_padding: 'False'
+              problem_type: null
+              pruned_heads: _Nothing.NOTHING
+              remove_invalid_values: 'False'
+              repetition_penalty: '1.0'
+              return_dict: 'True'
+              return_dict_in_generate: 'False'
+              rms_norm_eps: 1e-06
+              rope_scaling:
+                mrope_section:
+                - '16'
+                - '24'
+                - '24'
+                rope_type: default
+                type: default
+              rope_theta: '1000000.0'
+              seed: '0'
+              sep_token_id: null
+              sliding_window: '32768'
+              suppress_tokens: null
+              task_specific_params: null
+              temperature: '1.0'
+              tf_legacy_loss: 'False'
+              tie_encoder_decoder: 'False'
+              tie_word_embeddings: 'False'
+              tile_tag_type: space_separated
+              tokenizer_class: null
+              tokenizer_type: Qwen/Qwen2.5-VL-7B-Instruct
+              top_k: '50'
+              top_p: '1.0'
+              torch_dtype: bfloat16
+              torchscript: 'False'
+              training:
+                compile: false
+                context_parallel_degree: 1
+                data_parallel_replicate_degree: 1
+                data_parallel_shard_degree: -1
+                disable_loss_parallel: false
+                enable_cpu_offload: false
+                fsdp_reshard_after_forward: default
+                mixed_precision_param: bfloat16
+                mixed_precision_reduce: float32
+                steps: 400000
+                tensor_parallel_degree: 1
+                use_cosine_decay: false
+                use_linear_decay: true
+                warmup_steps: 1000
+              training_seq_len: '4096'
+              transformers_version: 4.51.0.dev0
+              typical_p: '1.0'
+              use_bfloat16: 'False'
+              use_cache: 'False'
+              use_fsdp2: 'True'
+              use_return_dict: 'True'
+              use_rope_from_torchtitan: 'False'
+              use_sliding_window: 'False'
+              video_token_id: '151656'
+              vision_config:
+                _target_: imaginaire.configs.reason1.model_config_qwen.QwenVisionConfig
+                add_cross_attention: 'False'
+                architectures: null
+                attn_implementation: flash_attention_2
+                attn_implementation_autoset: 'True'
+                bad_words_ids: null
+                begin_suppress_tokens: null
+                bos_token_id: null
+                chunk_size_feed_forward: '0'
+                cross_attention_hidden_size: null
+                decoder_start_token_id: null
+                depth: '32'
+                diversity_penalty: '0.0'
+                do_sample: 'False'
+                early_stopping: 'False'
+                embed_dim: null
+                encoder_no_repeat_ngram_size: '0'
+                eos_token_id: null
+                exponential_decay_length_penalty: null
+                finetuning_task: null
+                forced_bos_token_id: null
+                forced_eos_token_id: null
+                fullatt_block_indexes:
+                - '7'
+                - '15'
+                - '23'
+                - '31'
+                hidden_act: silu
+                hidden_size: '1280'
+                id2label:
+                  0: LABEL_0
+                  1: LABEL_1
+                in_channels: '3'
+                in_chans: '3'
+                intermediate_size: '3420'
+                is_decoder: 'False'
+                is_encoder_decoder: 'False'
+                label2id:
+                  LABEL_0: '0'
+                  LABEL_1: '1'
+                length_penalty: '1.0'
+                max_length: '20'
+                min_length: '0'
+                mlp_ratio: null
+                model_type: qwen2_5_vl
+                name_or_path: ''
+                no_repeat_ngram_size: '0'
+                num_beam_groups: '1'
+                num_beams: '1'
+                num_heads: '16'
+                num_return_sequences: '1'
+                out_hidden_size: '3584'
+                output_attentions: 'False'
+                output_hidden_states: 'False'
+                output_scores: 'False'
+                pad_token_id: null
+                patch_size: '14'
+                prefix: null
+                problem_type: null
+                pruned_heads: _Nothing.NOTHING
+                remove_invalid_values: 'False'
+                repetition_penalty: '1.0'
+                return_dict: 'True'
+                return_dict_in_generate: 'False'
+                sep_token_id: null
+                spatial_merge_size: '2'
+                spatial_patch_size: '14'
+                suppress_tokens: null
+                task_specific_params: null
+                temperature: '1.0'
+                temporal_patch_size: '2'
+                tf_legacy_loss: 'False'
+                tie_encoder_decoder: 'False'
+                tie_word_embeddings: 'True'
+                tokenizer_class: null
+                tokens_per_second: '2'
+                top_k: '50'
+                top_p: '1.0'
+                torch_dtype: bfloat16
+                torchscript: 'False'
+                typical_p: '1.0'
+                use_bfloat16: 'False'
+                window_size: '112'
+              vision_encoder: openai/clip-vit-base-patch32
+              vision_encoder_config:
+                depth_init: true
+                dim: 1024
+                ffn_dim_multiplier: null
+                head_dim: null
+                hidden_act: null
+                hidden_dim: 4096
+                image_size: 1024
+                image_token_id: null
+                multiple_of: null
+                n_heads: 16
+                n_kv_heads: null
+                n_layers: 24
+                norm_eps: 1.0e-05
+                norm_type: rmsnorm
+                num_channels: 3
+                patch_size: 16
+                proj_bias: null
+                qkv_bias: null
+                rope_theta: 10000.0
+                use_cache: false
+                use_rope_from_torchtitan: false
+              vision_encoder_in_channels: '3'
+              vision_end_token_id: '151653'
+              vision_start_token_id: '151652'
+              vision_token_id: '151654'
+              vocab_size: '152064'
+              z_loss_coeff: '0.0'
+            tokenizer:
+              _target_: <function build_tokenizer at 0x7cb2e9be27a0>
+              cache_dir: checkpoints/nvidia/Cosmos-Reason1-Private/tokenizer
+              tokenizer_type: Qwen/Qwen2.5-VL-7B-Instruct
+          n_layers_per_group: 5
+          num_tokens: 512
+        t5:
+          ckpt_path: checkpoints/google-t5/t5-11b
+          embed_dim: 1024
+          num_tokens: 512
+      timestamps:
+        is_forward: false
+        nfe: 35
+        order: 7.0
+        t_max: 80.0
+        t_min: 0.002
+      tokenizer:
+        _target_: <class 'cosmos_predict2.tokenizers.tokenizer.TokenizerInterface'>
+        chunk_duration: '81'
+        load_mean_std: 'False'
+        name: tokenizer
+        temporal_window: '16'
+        vae_pth: checkpoints/nvidia/Cosmos-Predict2-2B-Video2World/tokenizer/tokenizer.pth
+    precision: bfloat16
+    train_architecture: lora
+model_parallel:
+  _cpu_offloading_context: null
+  async_tensor_model_parallel_allreduce: false
+  autocast_dtype: torch.float32
+  barrier_with_L1_time: true
+  batch_p2p_comm: true
+  batch_p2p_sync: true
+  bf16: false
+  context_parallel_size: 1
+  cpu_offloading: false
+  cpu_offloading_activations: true
+  cpu_offloading_num_layers: 0
+  cpu_offloading_weights: true
+  cross_entropy_fusion_impl: native
+  cross_entropy_loss_fusion: false
+  deallocate_pipeline_outputs: false
+  defer_embedding_wgrad_compute: false
+  deterministic_mode: false
+  enable_autocast: false
+  expert_model_parallel_size: 1
+  expert_tensor_parallel_size: 1
+  finalize_model_grads_func: null
+  fp16: false
+  grad_scale_func: null
+  grad_sync_func: null
+  gradient_accumulation_fusion: false
+  hierarchical_context_parallel_sizes: null
+  microbatch_group_size_per_vp_stage: 1
+  moe_extended_tp: false
+  no_sync_func: null
+  num_microbatches_with_partial_activation_checkpoints: null
+  overlap_p2p_comm: false
+  overlap_p2p_comm_warmup_flush: false
+  param_sync_func: null
+  params_dtype: torch.float32
+  perform_initialization: true
+  pipeline_dtype: null
+  pipeline_model_parallel_comm_backend: null
+  pipeline_model_parallel_size: 1
+  pipeline_model_parallel_split_rank: null
+  sequence_parallel: false
+  tensor_model_parallel_size: 1
+  timers: null
+  tp_comm_atomic_ag: false
+  tp_comm_atomic_rs: false
+  tp_comm_bootstrap_backend: nccl
+  tp_comm_bulk_dgrad: true
+  tp_comm_bulk_wgrad: true
+  tp_comm_overlap: false
+  tp_comm_overlap_ag: true
+  tp_comm_overlap_disable_fc1: false
+  tp_comm_overlap_disable_qkv: false
+  tp_comm_overlap_rs: true
+  tp_comm_overlap_rs_dgrad: false
+  tp_comm_split_ag: true
+  tp_comm_split_rs: true
+  use_cpu_initialization: false
+  use_ring_exchange_p2p: false
+  use_te_rng_tracker: false
+  variable_seq_lengths: false
+  virtual_pipeline_model_parallel_size: null
+  wgrad_deferral_limit: 0
+optimizer:
+  _target_: <function get_base_optimizer at 0x7cb2afd3bf40>
+  betas:
+  - '0.9'
+  - '0.99'
+  capturable: 'True'
+  eps: 1e-08
+  lr: '4.315837287515549e-05'
+  master_weights: 'True'
+  model: null
+  optim_type: fusedadam
+  weight_decay: '0.1'
+scheduler:
+  _target_: <class 'cosmos_predict2.functional.lr_scheduler.LambdaLinearScheduler'>
+  cycle_lengths:
+  - '4000'
+  f_max:
+  - '0.6'
+  f_min:
+  - '0.0'
+  f_start:
+  - 1e-06
+  verbosity_interval: '0'
+  warm_up_steps:
+  - '200'
+trainer:
+  callbacks:
+    device_monitor:
+      _target_: <class 'cosmos_predict2.callbacks.device_monitor.DeviceMonitor'>
+      every_n: '10'
+      log_memory_detail: 'True'
+      step_size: '1'
+    grad_clip:
+      _target_: <class 'cosmos_predict2.callbacks.grad_clip.GradClip'>
+      clip_norm: '1.0'
+      force_finite: 'True'
+    iter_speed:
+      _target_: <class 'cosmos_predict2.callbacks.iter_speed.IterSpeed'>
+      every_n: '10'
+      hit_thres: '10'
+    loss_log:
+      _target_: <class 'cosmos_predict2.callbacks.loss_log.LossLog'>
+      logging_iter_multipler: '1'
+    low_prec:
+      _target_: <class 'imaginaire.utils.callback.LowPrecisionCallback'>
+      config: null
+      trainer: null
+      update_iter: '1'
+    manual_gc:
+      _target_: <class 'imaginaire.callbacks.manual_gc.ManualGarbageCollection'>
+      every_n: '5'
+      warm_up: '5'
+  cudnn:
+    benchmark: 'True'
+    deterministic: 'False'
+  ddp:
+    broadcast_buffers: 'True'
+    find_unused_parameters: 'False'
+    static_graph: 'True'
+  distributed_parallelism: fsdp
+  grad_accum_iter: '1'
+  grad_scaler_args:
+    enabled: 'False'
+  logging_iter: '10'
+  max_iter: '4000'
+  max_val_iter: null
+  memory_format: torch.preserve_format
+  profiling:
+    enable_memory_snapshot: 'False'
+    enable_profiling: 'False'
+    first_n_rank: '8'
+    profile_freq: '1'
+    profile_memory: 'True'
+    record_shape: 'True'
+    with_modules: 'True'
+    with_stack: 'True'
+  run_validation: 'False'
+  seed: '0'
+  timeout_period: '999999999'
+  type: <class 'imaginaire.trainer.ImaginaireTrainer'>
+  validation_iter: '500'

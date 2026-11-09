@@ -1,0 +1,5 @@
+[
+  {"input_video": "/workspace/gen_out/heldout_seeds/G1_WB_Dex5_Pickup_Pillow_val0.png", "prompt": "Lift the cup from the table and hold it up.", "output_video": "/workspace/gen_out/ood/cup_seed_pillow.mp4"},
+  {"input_video": "/workspace/gen_out/heldout_seeds/G1_WB_Dex5_Collect_Clothes_val0.png", "prompt": "Lift the cup from the table and hold it up.", "output_video": "/workspace/gen_out/ood/cup_seed_clothes.mp4"},
+  {"input_video": "/workspace/gen_out/heldout_seeds/G1_WB_Dex5_Put_Clothes_into_Washing_Machine_val0.png", "prompt": "Lift the cup from the table and hold it up.", "output_video": "/workspace/gen_out/ood/cup_seed_washer.mp4"}
+]

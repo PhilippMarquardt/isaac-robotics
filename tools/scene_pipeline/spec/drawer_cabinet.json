@@ -1,0 +1,10 @@
+{
+  "asset": "../assets/source/drawer_cabinet/drawer_cabinet_1k.usdc",
+  "out":   "../assets/usd/drawer_cabinet_v2.usd",
+  "interactives": [
+    {"kind": "animated_part", "name": "drawer_top",    "prim": "/drawer_cabinet/drawer_cabinet_drawer_01", "motion": "translate_y", "amplitude": -250.0},
+    {"kind": "animated_part", "name": "drawer_upper",  "prim": "/drawer_cabinet/drawer_cabinet_drawer_02", "motion": "translate_y", "amplitude": -250.0},
+    {"kind": "animated_part", "name": "drawer_lower",  "prim": "/drawer_cabinet/drawer_cabinet_drawer_03", "motion": "translate_y", "amplitude": -250.0},
+    {"kind": "animated_part", "name": "drawer_bottom", "prim": "/drawer_cabinet/drawer_cabinet_drawer_04", "motion": "translate_y", "amplitude": -250.0}
+  ]
+}
